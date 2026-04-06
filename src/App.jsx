@@ -519,6 +519,8 @@ export default function App() {
   const [matrixHideDone, setMatrixHideDone] = useState(false);
   const [matrixStatusFilter, setMatrixStatusFilter] = useState('all'); // 'all' | 'incomplete' | 'completed'
   const [collapsedStudents, setCollapsedStudents] = useState({}); // 모바일 학생 접기
+  const [hiddenStudents, setHiddenStudents] = useState({}); // 모바일 학생 on/off
+  const [studentSearchQuery, setStudentSearchQuery] = useState(''); // 학생 검색
   const [collapsedWeeks, setCollapsedWeeks] = useState({});
   const [classrooms, setClassrooms] = useState([]);
   const [activeClassFilter, setActiveClassFilter] = useState("all");
@@ -1141,7 +1143,7 @@ export default function App() {
     <ErrorBoundary>
       <SiteColorStyle color={siteColor} />
       {/* [FIX 2] 최상위에만 font-black 유지, 하위 요소에서 중복 제거 */}
-      <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20 select-none overflow-x-hidden font-black">
+      <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20 overflow-x-hidden font-black">
         <header className="text-white shadow-lg sticky top-0 z-40" style={{background:'var(--sc-darker)'}}>
           <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 text-left">
             <div className="flex items-center gap-3">
@@ -1367,21 +1369,63 @@ export default function App() {
 
                     return (
                       <div>
-                        {/* 주차 탭 */}
-                        {/* 전체 접기/펼치기 */}
-                        <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-                          <span className="text-[10px] font-black text-slate-400">학생 {visibleStudentsFiltered.length}명</span>
-                          <div className="flex gap-1.5">
-                            <button onClick={() => { const all = {}; visibleStudentsFiltered.forEach(s => { all[s.id] = false; }); setCollapsedStudents(all); }}
-                              className="px-2.5 py-1 rounded-lg text-[10px] font-black border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 transition-all">
-                              전체 펼치기
-                            </button>
-                            <button onClick={() => setCollapsedStudents({})}
-                              className="px-2.5 py-1 rounded-lg text-[10px] font-black border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 transition-all">
-                              전체 접기
-                            </button>
-                          </div>
-                        </div>
+                        {/* 검색 + 학생 칩 + 전체 토글 */}
+                        {(() => {
+                          const searchedStudents = visibleStudentsFiltered.filter(s =>
+                            !studentSearchQuery || s.name.includes(studentSearchQuery)
+                          );
+                          const allExpanded = searchedStudents.every(s => collapsedStudents[s.id] === false);
+                          return (
+                            <div className="border-b border-slate-100 bg-slate-50/30">
+                              {/* 검색창 */}
+                              <div className="px-4 pt-3 pb-2">
+                                <div className="relative">
+                                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300"/>
+                                  <input
+                                    value={studentSearchQuery}
+                                    onChange={e => setStudentSearchQuery(e.target.value)}
+                                    placeholder="학생 이름 검색..."
+                                    className="w-full pl-8 pr-8 py-2 rounded-xl border bg-white text-sm font-bold outline-none focus:border-indigo-300 text-slate-700 transition-all shadow-sm"
+                                  />
+                                  {studentSearchQuery && (
+                                    <button onClick={() => setStudentSearchQuery('')}
+                                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+                                      <LucideX size={13}/>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              {/* 학생 칩 - 누르면 해당 학생 펼치기/접기 */}
+                              <div className="px-4 pb-2 flex flex-wrap gap-1.5">
+                                {searchedStudents.map(s => (
+                                  <button key={s.id}
+                                    onClick={() => setCollapsedStudents(p => { const n={...p}; if(n[s.id]===false) delete n[s.id]; else n[s.id]=false; return n; })}
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-black border transition-all ${collapsedStudents[s.id] === false ? 'text-white border-transparent shadow-sm' : 'bg-white border-slate-300 text-slate-700'}`}
+                                    style={collapsedStudents[s.id] === false ? {background:'var(--sc)'} : {}}>
+                                    {s.name}
+                                  </button>
+                                ))}
+                              </div>
+                              {/* 인원수 + 전체 펼치기/접기 토글 버튼 하나 */}
+                              <div className="px-4 pb-2.5 flex items-center justify-between">
+                                <span className="text-[10px] font-black text-slate-400">
+                                  {studentSearchQuery ? `"${studentSearchQuery}" ${searchedStudents.length}명` : `${visibleStudentsFiltered.length}명`}
+                                </span>
+                                <button onClick={() => {
+                                  if (allExpanded) {
+                                    setCollapsedStudents({});
+                                  } else {
+                                    const all = {};
+                                    searchedStudents.forEach(s => { all[s.id] = false; });
+                                    setCollapsedStudents(all);
+                                  }
+                                }} className="px-3 py-1 rounded-lg text-[10px] font-black border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 transition-all flex items-center gap-1">
+                                  {allExpanded ? <><ChevronDown size={11}/> 전체 접기</> : <><ChevronRight size={11}/> 전체 펼치기</>}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
                         {activeTab === 'matrix' && weekGroupsM.length > 0 && (
                           <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap gap-2 items-center bg-slate-50/50">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">주차</span>
@@ -1407,7 +1451,9 @@ export default function App() {
                           </div>
                         )}
                         <div className="divide-y divide-slate-100">
-                          {visibleStudentsFiltered.map(s => {
+                          {visibleStudentsFiltered
+                            .filter(s => !studentSearchQuery || s.name.includes(studentSearchQuery))
+                            .map(s => {
                             const items = visibleItemsM;
 
                             // 진척도 계산 (전체 과제 기준)
@@ -1427,25 +1473,27 @@ export default function App() {
                             return (
                               <div key={s.id} className="p-4">
                                 {/* 학생 헤더 */}
-                                <div
-                                  className="flex items-center justify-between mb-3 cursor-pointer select-none"
-                                  onClick={() => setCollapsedStudents(p => ({ ...p, [s.id]: p[s.id] !== false }))}>
-                                  <div>
-                                    <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-between mb-2">
+                                  <button
+                                    className="flex-1 min-w-0 text-left"
+                                    onClick={() => setCollapsedStudents(p => { const n={...p}; if(n[s.id]===false) delete n[s.id]; else n[s.id]=false; return n; })}>
+                                    <div className="flex items-center gap-1.5">
+                                      {collapsedStudents[s.id] !== false
+                                        ? <ChevronRight size={14} className="text-slate-400 shrink-0"/>
+                                        : <ChevronDown size={14} className="text-slate-400 shrink-0"/>}
                                       <p className="text-base font-black text-slate-800">{s.name}</p>
-                                      {collapsedStudents[s.id] !== false ? <ChevronRight size={14} className="text-slate-400"/> : <ChevronDown size={14} className="text-slate-400"/>}
                                     </div>
-                                    <div className="flex flex-wrap gap-1 mt-1">
+                                    <div className="flex flex-wrap gap-1 mt-1 ml-5">
                                       {s.homeroomTeacher && <span className="flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-bold border border-indigo-100 leading-none"><UserCircle2 size={9}/> {s.homeroomTeacher}</span>}
                                       {s.highSchool && <span className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-50 text-slate-500 rounded text-[9px] font-bold border border-slate-100 leading-none"><School size={9}/> {s.highSchool}</span>}
                                     </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
+                                  </button>
+                                  {/* 오른쪽: 진척도 + 버튼들 */}
+                                  <div className="flex items-center gap-2 shrink-0">
                                     <div className={`text-right px-3 py-1.5 rounded-xl ${activeTab === 'matrix' ? 'bg-indigo-50' : 'bg-purple-50'}`}>
                                       <p className={`text-xs font-black ${activeTab === 'matrix' ? 'text-indigo-700' : 'text-purple-700'}`}>{pctText}</p>
                                       <p className={`text-[10px] font-black ${activeTab === 'matrix' ? 'text-indigo-400' : 'text-purple-400'}`}>{labelText}</p>
                                     </div>
-                                    {/* 모바일 일괄 버튼 */}
                                     {userRole === 'master' && (
                                       <button onClick={() => { setBulkSelectedDate(new Date().toISOString().split('T')[0]); setBulkSelectedStatus(null); setBulkDatePopup({ item: { id: `bulk-student-${s.id}`, title: `${s.name} 전체 과제`, isBulkStudent: true, studentId: s.id, items: visibleItemsM.filter(a => a.type === 'all' || a.targetStudents?.includes(s.id)) }, category: activeTab === 'matrix' ? 'assignment' : 'memorization' }); }}
                                         className="p-2 bg-indigo-50 rounded-xl text-indigo-500 hover:bg-indigo-100 transition-colors">
@@ -1455,8 +1503,15 @@ export default function App() {
                                     <button onClick={() => setSelectedStudent(s)}><Search size={16} className="text-slate-300 hover:text-indigo-600 transition-colors" /></button>
                                   </div>
                                 </div>
-                                {/* 과제 목록 - 접힌 상태면 숨김 */}
-                                {collapsedStudents[s.id] === false && <div className="space-y-2">
+                                {/* 과제 목록 - 아코디언 슬라이드 */}
+                                <div
+                                  style={{
+                                    maxHeight: collapsedStudents[s.id] === false ? '99999px' : '0px',
+                                    overflow: 'hidden',
+                                    transition: 'max-height 0.3s ease',
+                                  }}
+                                >
+                                <div className={items.length >= 10 ? "grid grid-cols-2 gap-2 pb-1" : "space-y-2 pb-1"}>
                                   {items.map(as => {
                                     const isTarget = as.type === 'all' || (as.targetStudents && as.targetStudents.includes(s.id));
                                     const subKey = `${s.id}-${as.id}`;
@@ -1520,7 +1575,8 @@ export default function App() {
                                       </div>
                                     );
                                   })}
-                                </div>}
+                                </div>
+                                </div>
                               </div>
                             );
                           })}
